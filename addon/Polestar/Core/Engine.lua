@@ -10985,6 +10985,9 @@ function Engine.AimWhileHere(i)
 	if not waypointOf(cur.g, cur.goal, nil, cur.s) then return false end
 	aim, cur.since = cur.goal, GetTime()
 	evaluate()
+	-- Drop a hand-picked target (a trip to a service), as a click on a step's goal does.
+	local nav = ns.Nav
+	if nav and nav.ReleaseTarget then nav.ReleaseTarget() end
 	return true
 end
 

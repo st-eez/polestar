@@ -549,6 +549,49 @@ fn the_line_never_takes_the_arrow_a_click_does_and_the_arrow_comes_back_when_it_
 	assert_eq!(out, vec![json!(["2:1 Kill Kobold Vermin, 2 more 50", "1:1"]), json!(true), json!("2:1"), json!(["none", "1:1"]), json!("none"), json!("8:1"), json!(["none", "1:1"])]);
 }
 
+// On a trip to a service (Nav.StartTrip: the nearest bank, a trainer), a click on a line takes the arrow off the
+// trip and onto the line, as a click on a step's goal does; the line still holds it until it goes.
+#[test]
+fn a_click_on_a_line_during_a_trip_to_a_service_takes_the_arrow() {
+	let out = emitted(&RunAddon {
+		stubs: vec!["stub_world.lua"],
+		before: WORLD.into(),
+		addons: vec![Addon::files("Polestar", &["Core/Core.xml", "Theme/Theme.xml", "Nav/Nav.xml"])],
+		saved: vec![("Polestar".into(), r#"PolestarCharDB = { schema = 1, guide = "test/here" }"#.into())],
+		script: [
+			TEST_PACK,
+			TEST_SOURCE,
+			&GUIDE.replace("ESCORT", ""),
+			HELPERS,
+			"stub.login()",
+			r#"stub.fire("QUEST_LOG_UPDATE"); stub.advance(0.6)"#,
+			r#"Polestar.Set("behavior.whileHereRadius", 60); stub.advance(0.6)"#,
+			r#"
+			local N = Polestar.Nav
+			-- Where the arrow points: the guide's "step:goal", else the picked point's label.
+			local function arrow()
+				local t = N.GetTarget()
+				if not t then return "none" end
+				return t.kind == "manual" and t.label or (t.stepIndex .. ":" .. t.goalIndex)
+			end
+			at(47.6, 37.6)
+			N.StartTrip(N.SetTarget(1429, 30, 30, "Bank", nil, "banker"), "Bank", "Banker")
+			emit({ here(), arrow(), N.Trip() ~= nil })
+			emit(E.AimWhileHere()); flush()
+			emit({ wp(), arrow(), N.Trip() ~= nil, N.IsOverride() })
+			w.progress(7, 1, 10); flush()
+			emit({ here(), arrow() })
+			"#,
+		]
+		.join("\n"),
+		..Default::default()
+	});
+	assert_eq!(out[0], json!(["2:1 Kill Kobold Vermin, 2 more 50", "Bank", true]), "the line shows, the arrow on the trip");
+	assert_eq!(out[1], json!(true));
+	assert_eq!(out[2], json!(["2:1", "2:1", false, false]), "the click takes the arrow off the trip");
+	assert_eq!(out[3], json!(["none", "1:1"]), "done, the arrow back on the guide");
+}
+
 // Nothing new happens later: objectives done early count as ever, so the vermin step is passed and the candles step
 // is shorter when the route gets there.
 #[test]
